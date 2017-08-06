@@ -1,0 +1,4 @@
+groups;name;first_name;password;ident
+student,class_A;Billy;Doe;password1;billydoe
+student,class_B;Timmy;Toe;password2;timmytoe
+teacher,class_A,class_B;John;Joe;password3;johnjoe
