@@ -37,29 +37,21 @@ def check_args( i ):
 def create_user( username, first_name, last_name, email, password ):
     os.system('yunohost user create ' + username + ' -f ' + first_name + ' -l ' + last_name + ' -m ' + email + ' -p ' + password)
     print('Created user ' + username)
-    print('-------------------------------------')
-    print(' ')
 
 
 def remove_user( username ):
     os.system('yunohost user remove ' + username)
     print('Removed user ' + username)
-    print('-------------------------------------')
-    print(' ')
 
 
 def create_group( group_name ):
     os.system('yunohost user group create ' + group_name)
     print('Created ' + group_name + ' group')
-    print('-------------------------------------')
-    print(' ')
 
 
 def add_users_group( group_name, users_list ):
     os.system('yunohost user group update ' + group_name + ' --add ' + ' '.join( users_list ))
     print('Added ' + str(len( users_list )) + ' accounts to ' + group_name + ' group')
-    print('-------------------------------------')
-    print(' ')
 
 
 
@@ -109,7 +101,7 @@ def generate_accounts( file_path ):
 
 
 ### Else, check the user and its group
-        groups_name = LINE[ groups_name_idx ].split(',')
+        groups_name = LINE[ groups_name_idx ].lower().split(',')
         first_name  = LINE[ first_name_idx ]
         last_name   = LINE[ last_name_idx ]
         password    = LINE[ password_idx ]
