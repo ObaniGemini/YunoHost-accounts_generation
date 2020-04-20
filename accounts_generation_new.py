@@ -35,31 +35,28 @@ def check_args( i ):
 
 
 def create_user( username, first_name, last_name, email, password ):
-    os.system('yunohost user create ' + username + ' -f ' + first_name + ' -l ' + last_name + ' -m ' + email + ' -p ' + password)
-    print('Created user ' + username)
+    os.system('yunohost user create "' + username + '" -f "' + first_name + '" -l "' + last_name + '" -m "' + email + '" -p "' + password + '"')
 
 
 def remove_user( username ):
-    os.system('yunohost user remove ' + username)
-    print('Removed user ' + username)
+    os.system('yunohost user delete "' + username + '"')
 
 
 def create_group( group_name ):
-    os.system('yunohost user group create ' + group_name)
-    print('Created ' + group_name + ' group')
+    os.system('yunohost user group create "' + group_name + '"')
 
 
 def add_users_group( group_name, users_list ):
-    os.system('yunohost user group update ' + group_name + ' --add ' + ' '.join( users_list ))
-    print('Added ' + str(len( users_list )) + ' accounts to ' + group_name + ' group')
+    os.system('yunohost user group update "' + group_name + '" -a ' + ' '.join( users_list ))
 
 
 
-def generate_accounts( file_path ):
+def generate_accounts():
     users_list = os.popen('yunohost user list | grep username | cut -d ":" -f 2').read().split()
     groups_list = os.popen('yunohost user group list | grep : | grep -v members | grep -v groups | cut -d ":" -f 1 ').read().split()
 
     for group in DEFAULT_GROUPS:
+        print('Keeping ' + group + ' group')
         groups_list.remove( group )
 
 
@@ -67,7 +64,7 @@ def generate_accounts( file_path ):
         os.system('yunohost user group delete ' + group)
 
 ### Retrieving the .csv file
-    filin = open( file_path, 'r' )
+    filin = open( FILE_PATH, 'r' )
     FILE = [ list( line.replace('\n','') ) for line in filin ]
     filin.close()
 
@@ -83,10 +80,7 @@ def generate_accounts( file_path ):
         FILE.pop()
 
     for line in FILE:
-        LINE = ''
-        for i in line:
-            LINE += i
-        LINE = LINE.replace('"', '')
+        LINE = ''.join( line ).replace('"', '')
         LINE = LINE.split(';')
 
 ### If this is the first line, you should initialize the order of the collumns. e.g : groups | names | first_names | ...
@@ -121,21 +115,23 @@ def generate_accounts( file_path ):
                 groups[ group_name ] = []
 
         if( username not in users_list ): ### Add those who joined us
-            create_user( username, first_name, last_name, username + '@' + DOMAIN_NAME, password )
+            create_user( username, first_name, last_name, '"' + username.replace('"', '') + '@' + DOMAIN_NAME + '"', password )
             for group_name in groups_name:
-                groups[ group_name ].append( username )
+                groups[ group_name ].append( '"' + username + '"' )
             created += 1
         else: ###Update those who still are with us
             users_list.remove( username )
             for group_name in groups_name:
-                groups[ group_name ].append( username )
+                groups[ group_name ].append( '"' + username + '"' )
             updated += 1
 
 ### Remove those who left us
     for user in users_list:
-        if not user in DEFAULT_USERS:
-            remove_user( user )
-            removed += 1
+        if user in DEFAULT_USERS:
+            print("Keeping " + user + " user")
+            continue
+        remove_user( user )
+        removed += 1
 
     print(' ')
     print('Created ' + str( groups_created ) + ' groups')
@@ -170,16 +166,25 @@ if args[ 1 ]:
 if args[ 2 ]:
     DOMAIN_NAME = sys.argv[ args[ 2 ] + 1 ]
 else:
-    domains = os.popen('yunohost domain list | grep "-"').read().replace('-', '').replace(' ','').split("\n")
+    domains = os.popen('yunohost domain list').read().split(':')[ 1 ].replace(' ', '').split("\n")
+    domains.remove('')
+
+    for i in range( len( domains ) ):
+        if( domains[ i ].startswith('-') ):
+            domains[ i ] = domains[ i ][1:]
+
+    for i in range( len( domains ) ):
+        if( domains[ i ].startswith('-') ):
+            domains[ i ] = domains[ i ][1:]
 
     chosen = 0
 
-    while( chosen == None || chosen <= 0 || chosen > len( domains ) ):
+    while( chosen == None or chosen <= 0 or chosen > len( domains ) ):
         for i in range( len( domains ) ):
             print( str( i + 1 ) + ' ' + domains[ i ] )
-        chosen = int(input('Please choose one of the following domains'))
+        chosen = int(input('Please choose one of the following domains\n'))
 
     DOMAIN_NAME = domains[ chosen - 1 ]
 
 
-generate_accounts( FILE_PATH )
+generate_accounts()

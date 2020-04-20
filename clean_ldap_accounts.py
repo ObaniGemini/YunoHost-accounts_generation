@@ -32,7 +32,7 @@ ROOT_PASSWORD = 'root_password'
 ADMIN_USER = 'admin'
 
 PROTECTED_USERS = [ 'aaplis' ]
-PROTECTED_GROUPS = [ 'all_users', 'visitors' ]
+PROTECTED_GROUPS = [ 'admins', 'all_users', 'visitors' ]
 
 def check_args( i ):
     for j in range( 2 ):
@@ -69,20 +69,23 @@ def delete_generated_accounts():
     to_delete = c.search( dn_base, search_filter='(|(cn=*)(uid=*))', search_scope=SUBTREE )
     j = 0
     for entry in c.response:
-        entry_attr = entry[ 'dn' ].split(',')
-        entry_attr = entry_attr[ 0 ]
-        entry_attr = attr.split('=')
+        attr = entry[ 'dn' ].split(',')
+        attr = [ attr[ 0 ].split('='), attr[ 1 ].split('=') ]
 
-        if 'cn' == attr[ 0 ] and ( attr[ 1 ] in PROTECTED_USERS or attr[ 1 ] in PROTECTED_GROUPS ):
+        if attr[ 1 ][ 1 ] != 'groups' and attr[ 1 ][ 1 ] != 'users':
             continue
 
-        if 'uid' == attr[ 0 ] and ( attr[ 1 ] in PROTECTED_USERS or attr[ 1 ] in PROTECTED_GROUPS ):
+        if 'cn' == attr[ 0 ][ 0 ] and ( attr[ 0 ][ 1 ] in PROTECTED_USERS or attr[ 0 ][ 1 ] in PROTECTED_GROUPS ):
             continue
 
-        print(entry)
-        print(entry_attr)
+        if 'uid' == attr[ 0 ][ 0 ] and ( attr[ 0 ][ 1 ] in PROTECTED_USERS or attr[ 0 ][ 1 ] in PROTECTED_GROUPS ):
+            continue
 
-        #c.delete( entry[ 'dn' ] )
+        if attr[ 1 ][ 1 ] == 'groups':
+            print('Deleting group ' + attr[ 0 ][ 1 ])
+        else:
+            print('Deleting user ' + attr[ 0 ][ 1 ])
+        c.delete( entry[ 'dn' ] )
         j += 1
 
     print('Deleted ' + str( j ) + ' groups and accounts')
