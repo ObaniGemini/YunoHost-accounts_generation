@@ -1,7 +1,6 @@
 import os
 import sys
-import ldap
-import ldap.modlist as modlist
+from ldap3 import Server, Connection, ALL, SUBTREE
 
 #
 """
@@ -10,7 +9,7 @@ import ldap.modlist as modlist
 	YOU NEED TO BE EITHER ROOT OR SUPER-USER TO RUN THAT SCRIPT
 	It requires :
 		- python3
-		- python3-ldap
+		- python3-ldap3
 		- yunohost
 
 	- init_ldap : initialize the connection to the ldap server
@@ -27,40 +26,64 @@ import ldap.modlist as modlist
 """
 #
 
-OPTIONS = [['-h', '--help'], ['-a', '--address'], ['-p', '--password']]
+OPTIONS = [['-h', '--help'], ['-a', '--address'], ['-p', '--password'], ['-u', '--user-admin']]
 SERVER_ADDRESS = 'server_address'
 ROOT_PASSWORD = 'root_password'
+ADMIN_USER = 'admin'
 
-PROTECTED_USERS = [ 'admin', 'aaplis' ]
+PROTECTED_USERS = [ 'aaplis' ]
 PROTECTED_GROUPS = [ 'all_users', 'visitors' ]
 
-def check_args(i):
-    for j in range(2):
-        if OPTIONS[i][j] in sys.argv:
+def check_args( i ):
+    for j in range( 2 ):
+        if OPTIONS[ i ][ j ] in sys.argv:
             return sys.argv.index(OPTIONS[i][j])
     return 0
     
 
 
-def init_ldap( address, root_password ):
+def init_ldap():
     print('Init connection to ldap')
-    global l, dn_base
-    l = ldap.initialize(address)
-    dn_base = os.popen('slapcat | grep ^dn:\ dc | cut -d" " -f2').read()
+    global c, dn_base
 
-    l.simple_bind_s('cn=admin,'+dn_base, root_password)
+    dn_base = os.popen('slapcat | grep dn:\ dc | cut -d " " -f2').read()
+    dn_admin = os.popen('slapcat | grep dn:\ cn=' + ADMIN_USER).read().split('\n')
 
+    if len( dn_admin ) == 0:
+        print('Admin user "' + ADMIN_USER + '" doesn\'t exist !')
+        exit( 1 )
+
+    dn_admin = dn_admin[ 0 ].split(' ')[ 1 ]
+
+    s = Server( host=SERVER_ADDRESS, get_info='ALL' )
+    c = Connection( s, user=dn_admin, password=ROOT_PASSWORD )
+
+    if not c.bind():
+        print( 'Error in bind', c.result )
+        exit( 1 )
 
 
 def delete_generated_accounts():
     print('Deleting existing groups and accounts\n')
 
-    to_delete = l.search_s( dn_base, ldap.SCOPE_SUBTREE, '(|(cn=*)(uid=*))', None )
+    to_delete = c.search( dn_base, search_filter='(|(cn=*)(uid=*))', search_scope=SUBTREE )
     j = 0
-    for i in to_delete:
+    for entry in c.response:
+        entry_attr = entry[ 'dn' ].split(',')
+        entry_attr = entry_attr[ 0 ]
+        entry_attr = attr.split('=')
+
+        if 'cn' == attr[ 0 ] and ( attr[ 1 ] in PROTECTED_USERS or attr[ 1 ] in PROTECTED_GROUPS ):
+            continue
+
+        if 'uid' == attr[ 0 ] and ( attr[ 1 ] in PROTECTED_USERS or attr[ 1 ] in PROTECTED_GROUPS ):
+            continue
+
+        print(entry)
+        print(entry_attr)
+
+        #c.delete( entry[ 'dn' ] )
         j += 1
-        if( i[ 1 ][ 'cn' ] not in PROTECTED_GROUPS && i[ 1 ][ 'uid' ] not in PROTECTED_USERS ):
-            l.delete( i[ 0 ] )
 
     print('Deleted ' + str( j ) + ' groups and accounts')
     print('-------------------------------------\n')
@@ -70,7 +93,7 @@ def delete_generated_accounts():
 
 ###------SCRIPT EXECUTION------###
 
-args = [ check_args(0), check_args(1), check_args(2)]
+args = [ check_args( 0 ), check_args( 1 ), check_args( 2 ), check_args( 3 ) ]
 
 if args[ 0 ]:
     print('\nUsage : command [OPTIONS] [ARGS]')
@@ -78,16 +101,20 @@ if args[ 0 ]:
     print(' -h  --help      Display this message')
     print(' -a  --address   Set server\'s address and port (1 arg)')
     print(' -p  --password  Enter server\'s root password (1 arg)')
+    print(' -u  --user-admin  Enter server\'s admin username (1 arg)')
     exit()
 if args[ 1 ]:
     SERVER_ADDRESS = sys.argv[ args[ 1 ] + 1 ]
 if args[ 2 ]:
     ROOT_PASSWORD = sys.argv[ args[ 2 ] + 1 ]
+if args[ 3 ]:
+    ADMIN_USER = sys.argv[ args[ 3 ] + 1 ]
+    PROTECTED_USERS.append( ADMIN_USER )
 
 
 
-init_ldap( SERVER_ADDRESS, ROOT_PASSWORD )
+init_ldap()
 delete_generated_accounts()
 os.system('yunohost app ssowatconf')
 print('Done !')
-l.unbind_s()
+c.unbind()

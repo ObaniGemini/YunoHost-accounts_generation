@@ -116,7 +116,7 @@ def generate_accounts( file_path ):
                 groups_list.append( group_name )
                 groups[ group_name ] = []
                 groups_created += 1
-            elif groups[ group_name ] == None:
+            elif group_name not in groups:
                 create_group( group_name )
                 groups[ group_name ] = []
 
